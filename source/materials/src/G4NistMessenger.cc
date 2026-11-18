@@ -135,8 +135,8 @@ G4NistMessenger::G4NistMessenger(G4NistManager* man) : manager(man)
   adensCmd->AvailableForStates(G4State_PreInit);
   adensCmd->SetToBeBroadcasted(false);
 
-  fPosiCmd = new G4UIcommand("/material/g4/ortoPositroniumFraction", this);
-  fPosiCmd->SetGuidance("defined orto-positronium fraction for positron annihilation AtRest.");
+  fPosiCmd = new G4UIcommand("/material/g4/positroniumPickoffLifetime", this);
+  fPosiCmd->SetGuidance("defined lifetime for pick-off of ortho- into para-positronium and vice versa.");
   fPosiCmd->SetGuidance("via material name, all - all materials.");
   fPosiCmd->AvailableForStates(G4State_PreInit);
   fPosiCmd->SetToBeBroadcasted(false);
@@ -144,8 +144,8 @@ G4NistMessenger::G4NistMessenger(G4NistManager* man) : manager(man)
   auto p1 = new G4UIparameter("matname", 's', false);
   fPosiCmd->SetParameter(p1);
 
-  auto p2 = new G4UIparameter("fraction", 'd', false);
-  p2->SetParameterRange("fraction>=0. && fraction <=1.");
+  auto p2 = new G4UIparameter("lifetime", 'd', false);
+  p2->SetParameterRange("lifetime>=0."); // I'll say that 0 means that the pick-off doesn't happen
   fPosiCmd->SetParameter(p2);
 }
 
@@ -218,20 +218,20 @@ void G4NistMessenger::SetNewValue(G4UIcommand* command, G4String newValue)
   else if (command == fPosiCmd)
   {
     G4String mnam{""};
-    G4double f{0.0};
+    G4double l{0.0};
     std::istringstream ss(newValue);
-    ss >> mnam >> f;
-    // set fraction for all materials
+    ss >> mnam >> l;
+    // set lifetime for all materials
     if (mnam == "all" || mnam == "none")
     {
-      if (mnam == "none" || f < 0.0)
+      if (mnam == "none" || l < 0.0)
       {
-        f = 0.0;
+        l = 0.0;
       }
       auto mtable = G4Material::GetMaterialTable();
       for (auto const& mat : *mtable)
       {
-        mat->GetIonisation()->SetOrtoPositroniumFraction(f);
+        mat->GetIonisation()->SetPositroniumPickoffLifetime(l);
       }
     }
     else
@@ -240,7 +240,7 @@ void G4NistMessenger::SetNewValue(G4UIcommand* command, G4String newValue)
       auto mat = manager->FindOrBuildMaterial(mnam, true);
       if (nullptr != mat)
       {
-        mat->GetIonisation()->SetOrtoPositroniumFraction(f);
+        mat->GetIonisation()->SetPositroniumPickoffLifetime(l);
       }
     }
   }
