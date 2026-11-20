@@ -40,6 +40,7 @@
 
 #include "G4DensityEffectCalculator.hh"
 #include "G4ios.hh"
+#include "G4PhysicalConstants.hh"
 #include "globals.hh"
 
 class G4Material;
@@ -126,8 +127,8 @@ class G4IonisParamMat
     inline G4double GetMeanEnergyPerIonPair() const { return fMeanEnergyPerIon; };
 
     // parameter for sampling of positron annihilation at rest
-    inline void SetOrtoPositroniumFraction(G4double value) { fOrtoPositroniumFraction = value; };
-    inline G4double GetOrtoPositroniumFraction() const { return fOrtoPositroniumFraction; };
+    inline void SetPositroniumPickoffLifetime(G4double value) { fPositroniumPickoffLifetime = value; };
+    inline G4double GetPositroniumPickoffLifetime() const { return fPositroniumPickoffLifetime; };
 
     // operators
     G4bool operator==(const G4IonisParamMat&) const = delete;
@@ -192,8 +193,10 @@ class G4IonisParamMat
     // average energy per ion pair
     G4double fMeanEnergyPerIon;
     G4double twoln10;
-    // parameter for sampling of positron annihilation at rest
-    G4double fOrtoPositroniumFraction{0.035};
+    // parameter for pick-off of ortho- into para- positronium and vice versa at rest due to in-medium effects
+    // default is average of Kp low and high Oxygen values for water from doi:10.1088/0031-9155/51/17/N05
+    // (table 1), converted into a lifetime
+    G4double fPositroniumPickoffLifetime{(1./2.805) * CLHEP::ns};
 
     // static data created only once
     static G4DensityEffectData* fDensityData;

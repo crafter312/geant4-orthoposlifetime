@@ -43,7 +43,6 @@
 #include "G4Log.hh"
 #include "G4Material.hh"
 #include "G4NistManager.hh"
-#include "G4PhysicalConstants.hh"
 #include "G4Pow.hh"
 #include "G4SystemOfUnits.hh"
 

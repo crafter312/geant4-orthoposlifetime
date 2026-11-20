@@ -70,8 +70,11 @@
 
 namespace
 {
-constexpr G4double fTauPara = 0.12 * CLHEP::ns;
-constexpr G4double fTauOrto = 142. * CLHEP::ns;
+constexpr G4double fTauPara  = 0.12 * CLHEP::ns;
+constexpr G4double fTauOrtho = 142. * CLHEP::ns;
+constexpr G4double fFPara    = 0.25;
+constexpr G4double fFOrtho   = 1. - fFPara;
+constexpr G4int fMaxPickoffIter = 100;
 }  // namespace
 
 //....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo....
@@ -184,19 +187,79 @@ G4VParticleChange* G4eplusAnnihilation::AtRestDoIt(const G4Track& track, const G
   }
 
   // sample secondaries
+  // see doi:10.1088/0031-9155/51/17/N05 for pick-off model (i.e. in-medium conversion of ortho- to para-positronium and vice versa)
   secParticles.clear();
-  G4double edep = 0.0;
-  G4double ltime;
-  if (nullptr != f3GammaAtRestModel
-      && G4UniformRand() < currentMaterial->GetIonisation()->GetOrtoPositroniumFraction())
+  G4double edep  = 0.0;
+  G4double ltime = 0.0;
+  G4double tauPickoff = currentMaterial->GetIonisation()->GetPositroniumPickoffLifetime();
+  if (nullptr != f3GammaAtRestModel)
   {
-    f3GammaAtRestModel->SampleSecondaries(secParticles, edep, couple->GetMaterial());
-    ltime = fTauOrto;
+    if (tauPickoff <= 0.0)
+    {
+      if (G4UniformRand() < fFOrtho)
+      {
+        f3GammaAtRestModel->SampleSecondaries(secParticles, edep, couple->GetMaterial());
+        ltime = - fTauOrtho * G4Log(G4UniformRand());
+      }
+      else
+      {
+        f2GammaAtRestModel->SampleSecondaries(secParticles, edep, couple->GetMaterial());
+        ltime = - fTauPara * G4Log(G4UniformRand());
+      }
+    }
+    else
+    {
+      G4double tauTemp, FinvTemp;
+      if (G4UniformRand() < fFOrtho)
+      {
+        tauTemp = fTauOrtho;
+        FinvTemp = 1. / fFPara;
+      }
+      else
+      {
+        tauTemp = fTauPara;
+        FinvTemp = 1. / fFOrtho;
+      }
+      G4double ltimeDec  = - tauTemp * G4Log(G4UniformRand());
+      G4double ltimePick = - tauPickoff * FinvTemp * G4Log(G4UniformRand());
+      G4int pickoffIterCount = 0;
+      while (ltimePick < ltimeDec)
+      {
+        if (pickoffIterCount >= fMaxPickoffIter)
+        {
+          G4cout << "WARNING: Maximum positronium pick-off iterations reached" << G4endl;
+          break;
+        }
+        ltime += ltimePick;
+        if (tauTemp == fTauOrtho)
+        {
+          tauTemp = fTauPara;
+          FinvTemp = 1. / fFOrtho;
+        }
+        else
+        {
+          tauTemp = fTauOrtho;
+          FinvTemp = 1. / fFPara;
+        }
+        ltimeDec  = - tauTemp * G4Log(G4UniformRand());
+        ltimePick = - tauPickoff * FinvTemp * G4Log(G4UniformRand());
+        pickoffIterCount++;
+      }
+      ltime += ltimeDec;
+      if (tauTemp == fTauOrtho)
+      {
+        f3GammaAtRestModel->SampleSecondaries(secParticles, edep, couple->GetMaterial());
+      }
+      else
+      {
+        f2GammaAtRestModel->SampleSecondaries(secParticles, edep, couple->GetMaterial());
+      }
+    }
   }
   else
   {
     f2GammaAtRestModel->SampleSecondaries(secParticles, edep, couple->GetMaterial());
-    ltime = fTauPara;
+    ltime = - fTauPara * G4Log(G4UniformRand());
   }
 
   // define new weight for primary and secondaries
@@ -233,7 +296,7 @@ G4VParticleChange* G4eplusAnnihilation::AtRestDoIt(const G4Track& track, const G
 
   if (num > 0)
   {
-    const G4double time = track.GetGlobalTime() - ltime * G4Log(G4UniformRand());
+    const G4double time = track.GetGlobalTime() + ltime;
     const G4ThreeVector& pos = track.GetPosition();
     auto touch = track.GetTouchableHandle();
     for (std::size_t i = 0; i < num; ++i)
